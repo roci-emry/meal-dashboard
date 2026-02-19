@@ -17,26 +17,42 @@ const DADS_STORE = [
   { item: 'Apples', qty: '6-8' },
 ];
 
+const HOUSEHOLD_OPTIONS = [
+  'Paper towels',
+  'Toilet paper', 
+  'Toothpaste',
+  'Contact solution',
+  'Laundry detergent',
+  'Trash bags',
+  'Dish soap',
+  'Dishwasher tabs',
+  'Hand soap',
+  'Batteries',
+];
+
 export default function Grocery() {
   const [weeklyPlan, setWeeklyPlan] = useState([]);
   const [cookbook, setCookbook] = useState([]);
   const [checkedItems, setCheckedItems] = useState({});
   const [customItems, setCustomItems] = useState([]);
   const [newItem, setNewItem] = useState('');
-  const [householdNeeded, setHouseholdNeeded] = useState([]);
+  const [addedPantry, setAddedPantry] = useState([]);
+  const [addedHousehold, setAddedHousehold] = useState([]);
 
   useEffect(() => {
     const savedPlan = localStorage.getItem('weeklyPlan');
     const savedCookbook = localStorage.getItem('cookbook-v2');
     const savedChecked = localStorage.getItem('groceryChecked');
     const savedCustom = localStorage.getItem('groceryCustom');
-    const savedHousehold = localStorage.getItem('householdNeeded');
+    const savedPantry = localStorage.getItem('addedPantry');
+    const savedHousehold = localStorage.getItem('addedHousehold');
     
     if (savedPlan) setWeeklyPlan(JSON.parse(savedPlan));
     if (savedCookbook) setCookbook(JSON.parse(savedCookbook));
     if (savedChecked) setCheckedItems(JSON.parse(savedChecked));
     if (savedCustom) setCustomItems(JSON.parse(savedCustom));
-    if (savedHousehold) setHouseholdNeeded(JSON.parse(savedHousehold));
+    if (savedPantry) setAddedPantry(JSON.parse(savedPantry));
+    if (savedHousehold) setAddedHousehold(JSON.parse(savedHousehold));
   }, []);
 
   const toggleChecked = (id) => {
@@ -61,12 +77,39 @@ export default function Grocery() {
     localStorage.setItem('groceryCustom', JSON.stringify(updated));
   };
 
-  const toggleHousehold = (item) => {
-    const updated = householdNeeded.includes(item)
-      ? householdNeeded.filter(i => i !== item)
-      : [...householdNeeded, item];
-    setHouseholdNeeded(updated);
-    localStorage.setItem('householdNeeded', JSON.stringify(updated));
+  const addPantryItem = (item) => {
+    if (!addedPantry.includes(item)) {
+      const updated = [...addedPantry, item];
+      setAddedPantry(updated);
+      localStorage.setItem('addedPantry', JSON.stringify(updated));
+    }
+  };
+
+  const removePantryItem = (item) => {
+    const updated = addedPantry.filter(i => i !== item);
+    setAddedPantry(updated);
+    localStorage.setItem('addedPantry', JSON.stringify(updated));
+  };
+
+  const addHouseholdItem = (item) => {
+    if (!addedHousehold.includes(item)) {
+      const updated = [...addedHousehold, item];
+      setAddedHousehold(updated);
+      localStorage.setItem('addedHousehold', JSON.stringify(updated));
+    }
+  };
+
+  const removeHouseholdItem = (item) => {
+    const updated = addedHousehold.filter(i => i !== item);
+    setAddedHousehold(updated);
+    localStorage.setItem('addedHousehold', JSON.stringify(updated));
+  };
+
+  const clearAllAdded = () => {
+    setAddedPantry([]);
+    setAddedHousehold([]);
+    localStorage.setItem('addedPantry', JSON.stringify([]));
+    localStorage.setItem('addedHousehold', JSON.stringify([]));
   };
 
   // Aggregate ingredients from weekly plan recipes
@@ -79,7 +122,6 @@ export default function Grocery() {
         const recipe = cookbook.find(r => r.id === day.meal.id);
         if (recipe) {
           recipe.ingredients.forEach(ing => {
-            // Skip pantry staples you already have
             if (!ing.pantry) {
               ingredients.push({
                 ...ing,
@@ -88,13 +130,11 @@ export default function Grocery() {
             }
           });
           
-          // Collect pantry staples needed
           recipe.pantryStaples.forEach(staple => pantryStaples.add(staple));
         }
       }
     });
     
-    // Group by category
     const grouped = {
       protein: ingredients.filter(i => i.category === 'protein'),
       produce: ingredients.filter(i => i.category === 'produce'),
@@ -108,8 +148,9 @@ export default function Grocery() {
 
   const { grouped, pantryStaples } = generateGroceryList();
   
-  // Calculate rough estimate
-  const itemCount = Object.values(grouped).flat().length + STAPLES.length;
+  const mainItemCount = Object.values(grouped).flat().length + STAPLES.length + DADS_STORE.length;
+  const addedItemCount = addedPantry.length + addedHousehold.length + customItems.length;
+  const totalItems = mainItemCount + addedItemCount;
 
   const checkboxStyle = (checked) => ({
     textDecoration: checked ? 'line-through' : 'none',
@@ -176,9 +217,9 @@ export default function Grocery() {
         alignItems: 'center'
       }}>
         <div>
-          <strong>{itemCount} items needed</strong>
+          <strong>{totalItems} items total</strong>
           <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>
-            Estimated: ~$150-200 total
+            {mainItemCount} from meal plan • {addedItemCount} added extras
           </p>
         </div>
         <button 
@@ -196,7 +237,7 @@ export default function Grocery() {
             fontSize: '14px'
           }}
         >
-          Reset All
+          Reset Checks
         </button>
       </div>
 
@@ -221,7 +262,7 @@ export default function Grocery() {
       )}
 
       <section style={{ ...sectionStyle, borderLeft: '4px solid #9c27b0' }}>
-        <h2>📦 Weekly Staples</h2>
+        <h2 style={{ marginTop: 0 }}>📦 Weekly Staples</h2>
         <div>
           {STAPLES.map((s, i) => (
             <label key={`staple-${i}`} style={checkboxStyle(checkedItems[`staple-${i}`])}>
@@ -238,7 +279,7 @@ export default function Grocery() {
       </section>
 
       <section style={{ ...sectionStyle, borderLeft: '4px solid #00bcd4' }}>
-        <h2>🏪 Dad's Store (Market of Lafayette Hill)</h2>
+        <h2 style={{ marginTop: 0 }}>🏪 Dad's Store (Market of Lafayette Hill)</h2>
         <div>
           {DADS_STORE.map((d, i) => (
             <label key={`dads-${i}`} style={checkboxStyle(checkedItems[`dads-${i}`])}>
@@ -254,55 +295,145 @@ export default function Grocery() {
         </div>
       </section>
 
-      <section style={{ ...sectionStyle, borderLeft: "4px solid #ff5722", background: "#fff3e0" }}>
-        <h2>🏠 Household Items</h2>
-        <p style={{ marginTop: 0, color: '#666', fontSize: '14px' }}>
-          Mark what you need this week. I'll remember for future lists.
-        </p>
-        <div>
-          {['Paper towels', 'Toilet paper', 'Toothpaste', 'Contact solution', 'Laundry detergent', 'Trash bags', 'Dish soap', 'Dishwasher tabs'].map((item, i) => (
-            <label key={`house-${i}`} style={{
-              ...checkboxStyle(householdNeeded.includes(item)),
-              background: householdNeeded.includes(item) ? '#ffebee' : 'transparent',
-            }}>
-              <input 
-                type="checkbox" 
-                checked={householdNeeded.includes(item)}
-                onChange={() => toggleHousehold(item)}
-              />
-              <span>{item}</span>
-              {householdNeeded.includes(item) && (
-                <span style={{ color: '#d32f2f', fontSize: '12px', marginLeft: '10px' }}>NEEDED</span>
-              )}
-            </label>
-          ))}
-        </div>
-      </section>
-
-      {pantryStaples.length > 0 && (
-        <section style={{ ...sectionStyle, borderLeft: '4px solid #607d8b', background: '#f5f5f5' }}>
-          <h2>🫙 Pantry Staples Check</h2>
+      {/* Added Pantry Items */}
+      {addedPantry.length > 0 && (
+        <section style={{ ...sectionStyle, borderLeft: '4px solid #607d8b' }}>
+          <h2 style={{ marginTop: 0 }}>🫙 Added Pantry Items</h2>
           <p style={{ marginTop: 0, color: '#666', fontSize: '14px' }}>
-            Do you have these oils, spices, and seasonings?
+            Clicked from "Pantry Staples Check" section below
           </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-            {pantryStaples.map((staple, i) => (
-              <span key={i} style={{
-                background: 'white',
-                padding: '8px 16px',
-                borderRadius: '20px',
-                fontSize: '14px',
-                border: '1px solid #ddd'
-              }}>
-                {staple}
-              </span>
+          <div>
+            {addedPantry.map((item, i) => (
+              <div key={`added-pantry-${i}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderBottom: '1px solid #eee' }}>
+                <label style={{ ...checkboxStyle(checkedItems[`added-pantry-${i}`]), flex: 1, borderBottom: 'none' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={checkedItems[`added-pantry-${i}`] || false}
+                    onChange={() => toggleChecked(`added-pantry-${i}`)}
+                  />
+                  <span>{item}</span>
+                </label>
+                <button 
+                  onClick={() => removePantryItem(item)}
+                  style={{
+                    padding: '4px 10px',
+                    background: '#999',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
             ))}
           </div>
         </section>
       )}
 
+      {/* Added Household Items */}
+      {addedHousehold.length > 0 && (
+        <section style={{ ...sectionStyle, borderLeft: '4px solid #ff5722', background: '#fff3e0' }}>
+          <h2 style={{ marginTop: 0 }}>🏠 Added Household Items</h2>
+          <p style={{ marginTop: 0, color: '#666', fontSize: '14px' }}>
+            Clicked from "Household Items" section below
+          </p>
+          <div>
+            {addedHousehold.map((item, i) => (
+              <div key={`added-house-${i}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderBottom: '1px solid #eee' }}>
+                <label style={{ ...checkboxStyle(checkedItems[`added-house-${i}`]), flex: 1, borderBottom: 'none' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={checkedItems[`added-house-${i}`] || false}
+                    onChange={() => toggleChecked(`added-house-${i}`)}
+                  />
+                  <span><strong>{item}</strong></span>
+                </label>
+                <button 
+                  onClick={() => removeHouseholdItem(item)}
+                  style={{
+                    padding: '4px 10px',
+                    background: '#999',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Pantry Staples Check - Clickable */}
+      {pantryStaples.length > 0 && (
+        <section style={{ ...sectionStyle, borderLeft: '4px solid #795548', background: '#fafafa' }}>
+          <h2 style={{ marginTop: 0 }}>🫙 Pantry Staples Check</h2>
+          <p style={{ marginTop: 0, color: '#666', fontSize: '14px' }}>
+            Need any of these? Click to add to your list:
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+            {pantryStaples.map((staple, i) => (
+              <button
+                key={i}
+                onClick={() => addPantryItem(staple)}
+                disabled={addedPantry.includes(staple)}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '20px',
+                  fontSize: '14px',
+                  border: '2px solid #795548',
+                  background: addedPantry.includes(staple) ? '#795548' : 'white',
+                  color: addedPantry.includes(staple) ? 'white' : '#795548',
+                  cursor: addedPantry.includes(staple) ? 'default' : 'pointer',
+                  opacity: addedPantry.includes(staple) ? 0.6 : 1,
+                }}
+              >
+                {addedPantry.includes(staple) ? '✓ ' : '+ '}{staple}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Household Items - Clickable */}
+      <section style={{ ...sectionStyle, borderLeft: '4px solid #ff5722', background: '#fafafa' }}>
+        <h2 style={{ marginTop: 0 }}>🏠 Household Items</h2>
+        <p style={{ marginTop: 0, color: '#666', fontSize: '14px' }}>
+          Need any of these? Click to add to your list:
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+          {HOUSEHOLD_OPTIONS.map((item, i) => (
+            <button
+              key={i}
+              onClick={() => addHouseholdItem(item)}
+              disabled={addedHousehold.includes(item)}
+              style={{
+                padding: '10px 16px',
+                borderRadius: '20px',
+                fontSize: '14px',
+                border: '2px solid #ff5722',
+                background: addedHousehold.includes(item) ? '#ff5722' : 'white',
+                color: addedHousehold.includes(item) ? 'white' : '#ff5722',
+                cursor: addedHousehold.includes(item) ? 'default' : 'pointer',
+                opacity: addedHousehold.includes(item) ? 0.6 : 1,
+              }}
+            >
+              {addedHousehold.includes(item) ? '✓ ' : '+ '}{item}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Custom Items */}
       <section style={{ ...sectionStyle, borderLeft: '4px solid #8bc34a' }}>
-        <h2>➕ Custom Items</h2>
+        <h2 style={{ marginTop: 0 }}>➕ Custom Items</h2>
         <form onSubmit={addCustomItem} style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
           <input
             type="text"
@@ -324,8 +455,8 @@ export default function Grocery() {
         </form>
         <div>
           {customItems.map((item) => (
-            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: 'white', borderRadius: '4px', marginBottom: '5px' }}>
-              <label style={checkboxStyle(checkedItems[`custom-${item.id}`])}>
+            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'white', borderRadius: '4px', marginBottom: '5px' }}>
+              <label style={{ ...checkboxStyle(checkedItems[`custom-${item.id}`]), flex: 1, borderBottom: 'none' }}>
                 <input 
                   type="checkbox" 
                   checked={checkedItems[`custom-${item.id}`] || false}
@@ -336,7 +467,7 @@ export default function Grocery() {
               <button 
                 onClick={() => removeCustomItem(item.id)}
                 style={{
-                  padding: '4px 8px',
+                  padding: '4px 10px',
                   background: '#f44336',
                   color: 'white',
                   border: 'none',
@@ -352,6 +483,25 @@ export default function Grocery() {
           {customItems.length === 0 && <p style={{ color: '#999', fontStyle: 'italic' }}>No custom items yet</p>}
         </div>
       </section>
+
+      {/* Clear All Added */}
+      {(addedPantry.length > 0 || addedHousehold.length > 0) && (
+        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <button 
+            onClick={clearAllAdded}
+            style={{
+              padding: '10px 20px',
+              background: '#999',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Clear All Added Items
+          </button>
+        </div>
+      )}
 
       <footer style={{ borderTop: '1px solid #ccc', paddingTop: '20px', color: '#666', fontSize: '14px' }}>
         <p>Check off items as you shop. Progress saves automatically.</p>
