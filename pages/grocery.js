@@ -254,7 +254,7 @@ export default function Grocery() {
         </div>
       </section>
 
-      <section style={{ ...sectionStyle, borderLeft: '4px solid '#ff5722', background: '#fff3e0' }}>
+      <section style={{ ...sectionStyle, borderLeft: "4px solid #ff5722", background: "#fff3e0" }}>
         <h2>🏠 Household Items</h2>
         <p style={{ marginTop: 0, color: '#666', fontSize: '14px' }}>
           Mark what you need this week. I'll remember for future lists.
