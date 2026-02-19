@@ -7,24 +7,32 @@ export default function Home() {
   const [showPlanBuilder, setShowPlanBuilder] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem('cookbook');
-    if (saved) {
-      const parsed = JSON.parse(saved);
+    const savedCookbook = localStorage.getItem('cookbook');
+    const savedPlan = localStorage.getItem('weeklyPlan');
+    
+    if (savedCookbook) {
+      const parsed = JSON.parse(savedCookbook);
       setMeals(parsed);
       
-      // Generate default weekly plan from frequent meals
-      const frequent = parsed.filter(m => m.category === 'frequent');
-      const moderate = parsed.filter(m => m.category === 'moderate');
-      
-      const defaultPlan = [
-        { day: 'Sunday', meal: frequent[0] || moderate[0], custom: false },
-        { day: 'Monday', meal: moderate[0] || frequent[1], custom: false },
-        { day: 'Tuesday', meal: frequent[1] || moderate[1], custom: false },
-        { day: 'Wednesday', meal: frequent[2] || moderate[2], custom: false },
-        { day: 'Thursday', meal: frequent[3] || moderate[3], custom: false },
-        { day: 'Friday', meal: frequent[4] || moderate[4], custom: false },
-      ];
-      setWeeklyPlan(defaultPlan);
+      // Check for existing plan first
+      if (savedPlan) {
+        setWeeklyPlan(JSON.parse(savedPlan));
+      } else {
+        // Generate default weekly plan from frequent meals
+        const frequent = parsed.filter(m => m.category === 'frequent');
+        const moderate = parsed.filter(m => m.category === 'moderate');
+        
+        const defaultPlan = [
+          { day: 'Sunday', meal: frequent[0] || moderate[0], custom: false },
+          { day: 'Monday', meal: moderate[0] || frequent[1], custom: false },
+          { day: 'Tuesday', meal: frequent[1] || moderate[1], custom: false },
+          { day: 'Wednesday', meal: frequent[2] || moderate[2], custom: false },
+          { day: 'Thursday', meal: frequent[3] || moderate[3], custom: false },
+          { day: 'Friday', meal: frequent[4] || moderate[4], custom: false },
+        ];
+        setWeeklyPlan(defaultPlan);
+        localStorage.setItem('weeklyPlan', JSON.stringify(defaultPlan));
+      }
     }
   }, []);
 
@@ -43,6 +51,7 @@ export default function Home() {
       { day: 'Friday', meal: shuffled[4] || moderate[4], custom: false },
     ];
     setWeeklyPlan(newPlan);
+    localStorage.setItem('weeklyPlan', JSON.stringify(newPlan));
   };
 
   const updateDay = (index, mealId) => {
@@ -51,29 +60,9 @@ export default function Home() {
     updated[index].meal = meal;
     updated[index].custom = true;
     setWeeklyPlan(updated);
+    localStorage.setItem('weeklyPlan', JSON.stringify(updated));
   };
 
-  const getGroceryList = () => {
-    const proteins = [];
-    const produce = ['Mini potatoes', 'Green beans', 'Broccoli', 'Broccoli slaw', 'Snap peas', 'Kale', 'Onions', 'Garlic', 'Ginger'];
-    const pantry = ['Far East cous cous', 'White rice', 'Wonton toppers'];
-    
-    weeklyPlan.forEach(day => {
-      if (day.meal) {
-        // Estimate protein needs based on meal name
-        if (day.meal.name.includes('chicken')) proteins.push('Chicken');
-        else if (day.meal.name.includes('pork')) proteins.push('Pork');
-        else if (day.meal.name.includes('beef')) proteins.push('Beef');
-        else if (day.meal.name.includes('salmon')) proteins.push('Salmon');
-        else if (day.meal.name.includes('turkey')) proteins.push('Turkey');
-        else if (day.meal.name.includes('shrimp')) proteins.push('Shrimp');
-      }
-    });
-    
-    return { proteins: [...new Set(proteins)], produce, pantry };
-  };
-
-  const grocery = getGroceryList();
   const leftoversCount = weeklyPlan.filter(d => d.meal?.hasLeftovers).length;
 
   return (
@@ -121,7 +110,7 @@ export default function Home() {
           <div>
             <strong>📊 Plan Summary</strong>
             <p style={{ margin: '5px 0 0 0' }}>
-              {leftoversCount} meals with leftovers • {grocery.proteins.length} proteins needed
+              {leftoversCount} meals with leftovers
             </p>
           </div>
           <div style={{ fontSize: '24px' }}>
@@ -178,45 +167,34 @@ export default function Home() {
         </div>
       </section>
 
-      <section style={{ marginBottom: '30px' }}>
-        <h2>🛒 Grocery Preview</h2>
-        
-        <h3>Proteins Needed</h3>
-        <ul>
-          {grocery.proteins.map((p, i) => <li key={i}>{p}</li>)}
-        </ul>
+      <div style={{ 
+        background: '#e8f5e9', 
+        padding: '20px', 
+        borderRadius: '8px', 
+        marginTop: '30px',
+        textAlign: 'center'
+      }}>
+        <p style={{ margin: '0 0 10px 0', fontSize: '16px' }}>
+          🛒 Ready to shop? View your full grocery list:
+        </p>
+        <a 
+          href="/grocery" 
+          style={{
+            display: 'inline-block',
+            padding: '12px 24px',
+            background: '#4caf50',
+            color: 'white',
+            textDecoration: 'none',
+            borderRadius: '4px',
+            fontWeight: 'bold'
+          }}
+        >
+          Open Grocery List →
+        </a>
+      </div>
 
-        <h3>Standard Produce</h3>
-        <ul>
-          {grocery.produce.map((p, i) => <li key={i}>{p}</li>)}
-        </ul>
-      </section>
-
-      <section style={{ marginBottom: '30px', background: '#fff3e0', padding: '15px', borderRadius: '8px' }}>
-        <h2>📦 Weekly Staples</h2>
-        <ul>
-          <li>Bananas — 1 bunch</li>
-          <li>Hummus (garlic/pine nut) — 1 container</li>
-          <li>Lactaid 2% milk — 1 gallon</li>
-          <li>Fage yogurt — 8 cups</li>
-          <li>Stok bold iced coffee — 2 bottles</li>
-          <li>Water (gallon jugs) — 3</li>
-          <li>Water (2.5gal fridge) — 2</li>
-          <li><strong>Paper towels — NEEDED</strong></li>
-        </ul>
-      </section>
-
-      <section style={{ marginBottom: '30px', background: '#e3f2fd', padding: '15px', borderRadius: '8px' }}>
-        <h2>🏪 Dad's Store (Market of Lafayette Hill)</h2>
-        <ul>
-          <li>Salmon fillet — ~1.5 lbs</li>
-          <li>Apples — 6-8</li>
-        </ul>
-      </section>
-
-      <footer style={{ borderTop: '1px solid #ccc', paddingTop: '20px', color: '#666', fontSize: '14px' }}>
-        <p>💰 Estimated: ~$85-95 (Giant) + ~$25-35 (Dad's)</p>
-        <p>🚀 Generated by Roci • Saturday 8:30 AM</p>
+      <footer style={{ borderTop: '1px solid #ccc', paddingTop: '20px', marginTop: '30px', color: '#666', fontSize: '14px' }}>
+        <p>🚀 Generated by Roci • Updates saved automatically</p>
       </footer>
     </div>
   );

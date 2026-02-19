@@ -6,11 +6,12 @@ export default function Nav() {
   
   const navStyle = {
     display: 'flex',
-    gap: '20px',
+    gap: '15px',
     padding: '15px 20px',
     background: '#333',
     marginBottom: '20px',
     borderRadius: '8px',
+    flexWrap: 'wrap',
   };
   
   const linkStyle = (active) => ({
@@ -20,6 +21,7 @@ export default function Nav() {
     padding: '8px 16px',
     borderRadius: '4px',
     background: active ? '#555' : 'transparent',
+    fontSize: '14px',
   });
 
   return (
@@ -29,6 +31,9 @@ export default function Nav() {
       </Link>
       <Link href="/cookbook" style={linkStyle(router.pathname === '/cookbook')}>
         📖 Cookbook
+      </Link>
+      <Link href="/grocery" style={linkStyle(router.pathname === '/grocery')}>
+        🛒 Grocery List
       </Link>
     </nav>
   );
