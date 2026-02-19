@@ -6,22 +6,22 @@ export default function Nav() {
   
   const navStyle = {
     display: 'flex',
-    gap: '15px',
-    padding: '15px 20px',
-    background: '#333',
-    marginBottom: '20px',
-    borderRadius: '8px',
+    gap: '10px',
+    padding: '10px 0',
+    marginBottom: '30px',
+    borderBottom: '2px solid #eee',
     flexWrap: 'wrap',
   };
   
   const linkStyle = (active) => ({
-    color: active ? '#fff' : '#aaa',
+    color: active ? '#2196f3' : '#666',
     textDecoration: 'none',
-    fontWeight: active ? 'bold' : 'normal',
-    padding: '8px 16px',
-    borderRadius: '4px',
-    background: active ? '#555' : 'transparent',
-    fontSize: '14px',
+    fontWeight: active ? '600' : '400',
+    padding: '10px 20px',
+    borderRadius: '8px',
+    background: active ? '#e3f2fd' : 'transparent',
+    fontSize: '15px',
+    transition: 'all 0.2s',
   });
 
   return (
