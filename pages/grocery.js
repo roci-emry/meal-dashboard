@@ -12,17 +12,6 @@ const STAPLES = [
   { item: 'Water (2.5 gal fridge dispensers)', qty: '2', category: 'beverages' },
 ];
 
-const HOUSEHOLD = [
-  { item: 'Paper towels', needed: true },
-  { item: 'Toilet paper', needed: false },
-  { item: 'Toothpaste', needed: false },
-  { item: 'Contact solution', needed: false },
-  { item: 'Laundry detergent', needed: false },
-  { item: 'Trash bags', needed: false },
-  { item: 'Dish soap', needed: false },
-  { item: 'Dishwasher tabs', needed: false },
-];
-
 const DADS_STORE = [
   { item: 'Salmon fillet', qty: '~1.5 lbs' },
   { item: 'Apples', qty: '6-8' },
@@ -34,17 +23,20 @@ export default function Grocery() {
   const [checkedItems, setCheckedItems] = useState({});
   const [customItems, setCustomItems] = useState([]);
   const [newItem, setNewItem] = useState('');
+  const [householdNeeded, setHouseholdNeeded] = useState([]);
 
   useEffect(() => {
     const savedPlan = localStorage.getItem('weeklyPlan');
-    const savedCookbook = localStorage.getItem('cookbook');
+    const savedCookbook = localStorage.getItem('cookbook-v2');
     const savedChecked = localStorage.getItem('groceryChecked');
     const savedCustom = localStorage.getItem('groceryCustom');
+    const savedHousehold = localStorage.getItem('householdNeeded');
     
     if (savedPlan) setWeeklyPlan(JSON.parse(savedPlan));
     if (savedCookbook) setCookbook(JSON.parse(savedCookbook));
     if (savedChecked) setCheckedItems(JSON.parse(savedChecked));
     if (savedCustom) setCustomItems(JSON.parse(savedCustom));
+    if (savedHousehold) setHouseholdNeeded(JSON.parse(savedHousehold));
   }, []);
 
   const toggleChecked = (id) => {
@@ -69,38 +61,55 @@ export default function Grocery() {
     localStorage.setItem('groceryCustom', JSON.stringify(updated));
   };
 
+  const toggleHousehold = (item) => {
+    const updated = householdNeeded.includes(item)
+      ? householdNeeded.filter(i => i !== item)
+      : [...householdNeeded, item];
+    setHouseholdNeeded(updated);
+    localStorage.setItem('householdNeeded', JSON.stringify(updated));
+  };
+
+  // Aggregate ingredients from weekly plan recipes
   const generateGroceryList = () => {
-    const proteins = [];
-    const produce = ['Mini potatoes', 'Green beans', 'Broccoli', 'Broccoli slaw', 'Snap peas', 'Kale', 'Yellow onions', 'Garlic', 'Fresh ginger'];
-    const pantry = ['Far East cous cous (garlic/pine nut/chicken flavored)', 'White rice', 'Wonton salad toppers'];
+    const ingredients = [];
+    const pantryStaples = new Set();
     
     weeklyPlan.forEach(day => {
       if (day.meal) {
-        const name = day.meal.name.toLowerCase();
-        if (name.includes('chicken')) proteins.push({ name: 'Chicken', meal: day.meal.name, qty: day.meal.hasLeftovers ? '3-4 lbs (extra for leftovers)' : '2-3 lbs' });
-        else if (name.includes('pork')) proteins.push({ name: 'Pork', meal: day.meal.name, qty: day.meal.hasLeftovers ? '2.5-3 lbs (extra for leftovers)' : '2 lbs' });
-        else if (name.includes('beef')) proteins.push({ name: 'Beef', meal: day.meal.name, qty: '2 lbs' });
-        else if (name.includes('salmon')) proteins.push({ name: 'Salmon', meal: day.meal.name, qty: '1.5 lbs (from Dad\'s Store)' });
-        else if (name.includes('turkey')) proteins.push({ name: 'Turkey', meal: day.meal.name, qty: '2 lbs' });
-        else if (name.includes('shrimp')) proteins.push({ name: 'Shrimp', meal: day.meal.name, qty: '1.5 lbs' });
-        else if (name.includes('meatloaf')) proteins.push({ name: 'Ground beef', meal: day.meal.name, qty: '2 lbs' });
+        const recipe = cookbook.find(r => r.id === day.meal.id);
+        if (recipe) {
+          recipe.ingredients.forEach(ing => {
+            // Skip pantry staples you already have
+            if (!ing.pantry) {
+              ingredients.push({
+                ...ing,
+                meal: recipe.name
+              });
+            }
+          });
+          
+          // Collect pantry staples needed
+          recipe.pantryStaples.forEach(staple => pantryStaples.add(staple));
+        }
       }
     });
     
-    // Remove duplicates and consolidate
-    const uniqueProteins = [];
-    proteins.forEach(p => {
-      const existing = uniqueProteins.find(up => up.name === p.name);
-      if (!existing) {
-        uniqueProteins.push(p);
-      }
-    });
+    // Group by category
+    const grouped = {
+      protein: ingredients.filter(i => i.category === 'protein'),
+      produce: ingredients.filter(i => i.category === 'produce'),
+      dairy: ingredients.filter(i => i.category === 'dairy'),
+      pantry: ingredients.filter(i => i.category === 'pantry' && !i.pantry),
+      bakery: ingredients.filter(i => i.category === 'bakery'),
+    };
     
-    return { proteins: uniqueProteins, produce, pantry };
+    return { grouped, pantryStaples: Array.from(pantryStaples) };
   };
 
-  const grocery = generateGroceryList();
-  const estimatedCost = grocery.proteins.length * 15 + 40; // Rough estimate
+  const { grouped, pantryStaples } = generateGroceryList();
+  
+  // Calculate rough estimate
+  const itemCount = Object.values(grouped).flat().length + STAPLES.length;
 
   const checkboxStyle = (checked) => ({
     textDecoration: checked ? 'line-through' : 'none',
@@ -108,17 +117,51 @@ export default function Grocery() {
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
-    padding: '8px',
+    padding: '10px',
     background: checked ? '#f5f5f5' : 'transparent',
     borderRadius: '4px',
     cursor: 'pointer',
+    borderBottom: '1px solid #eee',
   });
+
+  const sectionStyle = {
+    marginBottom: '30px',
+    background: 'white',
+    padding: '20px',
+    borderRadius: '8px',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+  };
+
+  const renderIngredientGroup = (title, items, color) => {
+    if (items.length === 0) return null;
+    return (
+      <section style={{ ...sectionStyle, borderLeft: `4px solid ${color}` }}>
+        <h2 style={{ marginTop: 0 }}>{title}</h2>
+        <div>
+          {items.map((item, i) => (
+            <label key={`${title}-${i}`} style={checkboxStyle(checkedItems[`${title}-${i}`])}>
+              <input 
+                type="checkbox" 
+                checked={checkedItems[`${title}-${i}`] || false}
+                onChange={() => toggleChecked(`${title}-${i}`)}
+              />
+              <span style={{ flex: 1 }}>
+                <strong>{item.item}</strong>
+                {item.source && <span style={{ color: '#2196f3', fontSize: '12px', marginLeft: '8px' }}>({item.source})</span>}
+              </span>
+              <span style={{ color: '#666', fontSize: '14px' }}>{item.qty}</span>
+            </label>
+          ))}
+        </div>
+      </section>
+    );
+  };
 
   return (
     <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: '900px', margin: '0 auto', padding: '20px' }}>
       <header style={{ borderBottom: '2px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>
         <h1>🛒 Grocery List</h1>
-        <p style={{ color: '#666' }}>Week of {new Date().toLocaleDateString()} • Based on your meal plan</p>
+        <p style={{ color: '#666' }}>Based on your meal plan • Cross off as you shop</p>
       </header>
 
       <Nav />
@@ -133,9 +176,9 @@ export default function Grocery() {
         alignItems: 'center'
       }}>
         <div>
-          <strong>💰 Estimated Total: ${estimatedCost}-${estimatedCost + 30}</strong>
+          <strong>{itemCount} items needed</strong>
           <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>
-            {grocery.proteins.length} proteins • {STAPLES.length} staples • Cross off items as you shop
+            Estimated: ~$150-200 total
           </p>
         </div>
         <button 
@@ -157,110 +200,108 @@ export default function Grocery() {
         </button>
       </div>
 
-      <section style={{ marginBottom: '30px' }}>
-        <h2>🥩 Proteins (Organic when available)</h2>
-        <div style={{ display: 'grid', gap: '5px' }}>
-          {grocery.proteins.map((p, i) => (
-            <label key={i} style={checkboxStyle(checkedItems[`protein-${i}`])}>
-              <input 
-                type="checkbox" 
-                checked={checkedItems[`protein-${i}`] || false}
-                onChange={() => toggleChecked(`protein-${i}`)}
-              />
-              <span>
-                <strong>{p.name}</strong> — {p.qty}
-                <span style={{ color: '#666', fontSize: '12px', marginLeft: '10px' }}>(for {p.meal})</span>
-              </span>
-            </label>
-          ))}
-          {grocery.proteins.length === 0 && <p style={{ color: '#999', fontStyle: 'italic' }}>No proteins needed this week</p>}
+      {weeklyPlan.length === 0 ? (
+        <div style={{ 
+          background: '#fff3e0', 
+          padding: '30px', 
+          borderRadius: '8px', 
+          textAlign: 'center',
+          marginBottom: '30px'
+        }}>
+          <p>No meal plan yet! Grocery list will populate after Saturday planning.</p>
         </div>
-      </section>
+      ) : (
+        <>
+          {renderIngredientGroup('🥩 Proteins', grouped.protein, '#f44336')}
+          {renderIngredientGroup('🥬 Produce', grouped.produce, '#4caf50')}
+          {renderIngredientGroup('🥛 Dairy', grouped.dairy, '#2196f3')}
+          {renderIngredientGroup('🥫 Pantry', grouped.pantry, '#ff9800')}
+          {renderIngredientGroup('🍞 Bakery', grouped.bakery, '#795548')}
+        </>
+      )}
 
-      <section style={{ marginBottom: '30px' }}>
-        <h2>🥬 Produce</h2>
-        <div style={{ display: 'grid', gap: '5px' }}>
-          {grocery.produce.map((p, i) => (
-            <label key={i} style={checkboxStyle(checkedItems[`produce-${i}`])}>
-              <input 
-                type="checkbox" 
-                checked={checkedItems[`produce-${i}`] || false}
-                onChange={() => toggleChecked(`produce-${i}`)}
-              />
-              <span>{p}</span>
-            </label>
-          ))}
-        </div>
-      </section>
-
-      <section style={{ marginBottom: '30px' }}>
-        <h2>🥫 Pantry</h2>
-        <div style={{ display: 'grid', gap: '5px' }}>
-          {grocery.pantry.map((p, i) => (
-            <label key={i} style={checkboxStyle(checkedItems[`pantry-${i}`])}>
-              <input 
-                type="checkbox" 
-                checked={checkedItems[`pantry-${i}`] || false}
-                onChange={() => toggleChecked(`pantry-${i}`)}
-              />
-              <span>{p}</span>
-            </label>
-          ))}
-        </div>
-      </section>
-
-      <section style={{ marginBottom: '30px', background: '#fff3e0', padding: '20px', borderRadius: '8px' }}>
+      <section style={{ ...sectionStyle, borderLeft: '4px solid #9c27b0' }}>
         <h2>📦 Weekly Staples</h2>
-        <div style={{ display: 'grid', gap: '5px' }}>
+        <div>
           {STAPLES.map((s, i) => (
-            <label key={i} style={checkboxStyle(checkedItems[`staple-${i}`])}>
+            <label key={`staple-${i}`} style={checkboxStyle(checkedItems[`staple-${i}`])}>
               <input 
                 type="checkbox" 
                 checked={checkedItems[`staple-${i}`] || false}
                 onChange={() => toggleChecked(`staple-${i}`)}
               />
-              <span><strong>{s.item}</strong> — {s.qty}</span>
+              <span style={{ flex: 1 }}><strong>{s.item}</strong></span>
+              <span style={{ color: '#666', fontSize: '14px' }}>{s.qty}</span>
             </label>
           ))}
         </div>
       </section>
 
-      <section style={{ marginBottom: '30px', background: '#ffebee', padding: '20px', borderRadius: '8px' }}>
-        <h2>🏠 Household</h2>
-        <div style={{ display: 'grid', gap: '5px' }}>
-          {HOUSEHOLD.map((h, i) => (
-            <label key={i} style={checkboxStyle(checkedItems[`household-${i}`])}>
-              <input 
-                type="checkbox" 
-                checked={checkedItems[`household-${i}`] || false}
-                onChange={() => toggleChecked(`household-${i}`)}
-              />
-              <span>
-                {h.item}
-                {h.needed && <strong style={{ color: '#d32f2f', marginLeft: '10px' }}>— NEEDED</strong>}
-              </span>
-            </label>
-          ))}
-        </div>
-      </section>
-
-      <section style={{ marginBottom: '30px', background: '#e3f2fd', padding: '20px', borderRadius: '8px' }}>
+      <section style={{ ...sectionStyle, borderLeft: '4px solid #00bcd4' }}>
         <h2>🏪 Dad's Store (Market of Lafayette Hill)</h2>
-        <div style={{ display: 'grid', gap: '5px' }}>
+        <div>
           {DADS_STORE.map((d, i) => (
-            <label key={i} style={checkboxStyle(checkedItems[`dads-${i}`])}>
+            <label key={`dads-${i}`} style={checkboxStyle(checkedItems[`dads-${i}`])}>
               <input 
                 type="checkbox" 
                 checked={checkedItems[`dads-${i}`] || false}
                 onChange={() => toggleChecked(`dads-${i}`)}
               />
-              <span><strong>{d.item}</strong> — {d.qty}</span>
+              <span style={{ flex: 1 }}><strong>{d.item}</strong></span>
+              <span style={{ color: '#666', fontSize: '14px' }}>{d.qty}</span>
             </label>
           ))}
         </div>
       </section>
 
-      <section style={{ marginBottom: '30px', background: '#f3e5f5', padding: '20px', borderRadius: '8px' }}>
+      <section style={{ ...sectionStyle, borderLeft: '4px solid '#ff5722', background: '#fff3e0' }}>
+        <h2>🏠 Household Items</h2>
+        <p style={{ marginTop: 0, color: '#666', fontSize: '14px' }}>
+          Mark what you need this week. I'll remember for future lists.
+        </p>
+        <div>
+          {['Paper towels', 'Toilet paper', 'Toothpaste', 'Contact solution', 'Laundry detergent', 'Trash bags', 'Dish soap', 'Dishwasher tabs'].map((item, i) => (
+            <label key={`house-${i}`} style={{
+              ...checkboxStyle(householdNeeded.includes(item)),
+              background: householdNeeded.includes(item) ? '#ffebee' : 'transparent',
+            }}>
+              <input 
+                type="checkbox" 
+                checked={householdNeeded.includes(item)}
+                onChange={() => toggleHousehold(item)}
+              />
+              <span>{item}</span>
+              {householdNeeded.includes(item) && (
+                <span style={{ color: '#d32f2f', fontSize: '12px', marginLeft: '10px' }}>NEEDED</span>
+              )}
+            </label>
+          ))}
+        </div>
+      </section>
+
+      {pantryStaples.length > 0 && (
+        <section style={{ ...sectionStyle, borderLeft: '4px solid #607d8b', background: '#f5f5f5' }}>
+          <h2>🫙 Pantry Staples Check</h2>
+          <p style={{ marginTop: 0, color: '#666', fontSize: '14px' }}>
+            Do you have these oils, spices, and seasonings?
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+            {pantryStaples.map((staple, i) => (
+              <span key={i} style={{
+                background: 'white',
+                padding: '8px 16px',
+                borderRadius: '20px',
+                fontSize: '14px',
+                border: '1px solid #ddd'
+              }}>
+                {staple}
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section style={{ ...sectionStyle, borderLeft: '4px solid #8bc34a' }}>
         <h2>➕ Custom Items</h2>
         <form onSubmit={addCustomItem} style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
           <input
@@ -272,7 +313,7 @@ export default function Grocery() {
           />
           <button type="submit" style={{
             padding: '10px 20px',
-            background: '#9c27b0',
+            background: '#4caf50',
             color: 'white',
             border: 'none',
             borderRadius: '4px',
@@ -281,9 +322,9 @@ export default function Grocery() {
             Add
           </button>
         </form>
-        <div style={{ display: 'grid', gap: '5px' }}>
+        <div>
           {customItems.map((item) => (
-            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: 'white', borderRadius: '4px' }}>
+            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px', background: 'white', borderRadius: '4px', marginBottom: '5px' }}>
               <label style={checkboxStyle(checkedItems[`custom-${item.id}`])}>
                 <input 
                   type="checkbox" 
@@ -314,7 +355,7 @@ export default function Grocery() {
 
       <footer style={{ borderTop: '1px solid #ccc', paddingTop: '20px', color: '#666', fontSize: '14px' }}>
         <p>Check off items as you shop. Progress saves automatically.</p>
-        <p>🚀 Generated by Roci • Updated based on your meal plan</p>
+        <p>🚀 Generated by Roci • Based on your weekly meal plan</p>
       </footer>
     </div>
   );
